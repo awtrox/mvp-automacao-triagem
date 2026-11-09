@@ -1,0 +1,30 @@
+name: CI Pipeline - MVP Triagem
+
+on:
+    push:
+        branches: ["main", "master"]
+    pull_request:
+        branches: ["main", "master"]
+
+jobs: 
+    build-and-test:
+        runs-on: ubuntu-latest
+
+        steps:
+        - name: Fazer o checkout do repositório
+          uses: actions/checkout@v3
+        
+        - name: Configurar o python 3.11
+          uses: actions/setup-python@v4
+          with:
+            python-version: "3.11"
+
+        - name: Instalar dependências
+          run: |
+            python -m pip install --upgrade pip
+            pip install pytest
+
+        - name: Executar testes com Pytest
+          run: |
+            pytest tests/
+    

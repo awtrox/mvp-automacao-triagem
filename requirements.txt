@@ -1,0 +1,6 @@
+PySide6>=6.6.0       # Interface gráfica (Telas do MVP)
+PyAutoGUI>=0.9.54    # Automação de teclado e mouse
+opencv-python>=4.8.0 # Necessário para o PyAutoGUI reconhecer imagens na tela com precisão
+bcrypt>=4.0.1        # Criptografia e hash para a senha de administrador
+pytest>=7.4.0        # Framework para estruturar e executar os testes automatizados
+keyboard>=0.13.5     # Para escuta global dos atalhos (Ctrl+Shift+U)
