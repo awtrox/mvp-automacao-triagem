@@ -1,9 +1,17 @@
 import sys
 import time
+import json
+import os
 from PySide6.QtWidgets import (QApplication, QMainWindow, QStackedWidget, QWidget, 
                                QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
-                               QLineEdit, QTableWidget, QTableWidgetItem, QHeaderView, QFrame)
+                               QLineEdit, QTableWidget, QTableWidgetItem, QHeaderView, 
+                               QFrame, QFileDialog)
 from PySide6.QtCore import Qt, QTimer
+PASTA_DATA = os.path.join(os.path.dirname(__file__), 'data')
+ARQUIVO_CONFIG = os.path.join(PASTA_DATA, 'config.json')
+
+if not os.path.exists(PASTA_DATA):
+    os.makedirs(PASTA_DATA)
 
 STYLE_SHEET = """
     QWidget {
@@ -32,12 +40,39 @@ STYLE_SHEET = """
         font-weight: bold;
         color: white;
     }
-    QPushButton#BtnPrimario:hover { background-color: #0056B3; }
+    QPushButton#BtnPrimario:hover { 
+        background-color: #0056B3; 
+    }
+
+    QPushButton#BtnPrimario:pressed {
+        background-color: #004085; 
+    }
 
     QPushButton#BtnCancelar {
+        background-color: #2A2A3C;
+        color: #B4B4C8;
         border: 1px solid #B4B4C8; 
         border-radius: 6px; 
         font-weight: bold;
+    }
+
+    QPushButton#BtnCancelar:hover {
+        background-color: #3F3F5A;
+        color: #FFFFFF;
+    }    
+    QPushButton#BtnCancelar:pressed {
+        background-color: #1E1E2E;
+    }
+    QPushButton#BtnAddAncora {
+        background-color: #2E7D32;
+        color: #FFFFFF;
+        border-radius: 2px
+    }
+    QPushButton#BtnAddAncora:hover {
+        background-color: #388E3C;
+    }
+    QPushButton#BtnAddAncora:pressed {
+        background-color: #1B5E20;
     }
     /* Foco visível para navegação no teclado */
     QPushButton:focus, QLineEdit:focus, QTableWidget:focus, 
@@ -56,6 +91,10 @@ STYLE_SHEET = """
         border: 1px solid #3A3A50;
         border-radius: 4px;
         gridline-color: #3A3A50;
+    }
+    QTableWidget::item {
+        padding-left: 5px;
+        padding-right: 5px;
     }
     QHeaderView::section {
         background-color: #1E1E2E;
@@ -182,7 +221,11 @@ class TelaAuth(QWidget):
             else:
                 self.verificar_senha()
         else:
-            super().keyPressEvent(event)
+            if event.text() and not self.input_senha.hasFocus():
+                self.input_senha.setFocus()
+                self.input_senha.keyPressEvent(event)
+            else:
+                super().keyPressEvent(event)
 
 
 class TelaConfig(QWidget):
@@ -202,19 +245,23 @@ class TelaConfig(QWidget):
         tabela_label.setStyleSheet("font-size: 16px; margin-top: 20px;")
         tabela_label.setAlignment(Qt.AlignCenter)
 
-        self.tabela = QTableWidget(1, 3)
+        self.tabela = QTableWidget(0, 3)
+        self.tabela.setTextElideMode(Qt.ElideMiddle)
+        self.tabela.setWordWrap(False)
         self.tabela.setTabKeyNavigation(False)
         self.tabela.setHorizontalHeaderLabels(["Ordem", "Nome do campo", "Caminho da imagem"])
         self.tabela.verticalHeader().setVisible(False)
         header = self.tabela.horizontalHeader()
-        header.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
         header.setSectionResizeMode(2, QHeaderView.Stretch)
+        header.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.tabela.cellDoubleClicked.connect(self.escolher_imagem)
 
-        self.tabela.setItem(0,0, QTableWidgetItem("1"))
-        self.tabela.setItem(0,1, QTableWidgetItem("campo_procedimento"))
-        self.tabela.setItem(0,2, QTableWidgetItem("C:\\img\\proced...png"))
+        self.btn_add_linha = QPushButton("+ Adicionar Âncora")
+        self.btn_add_linha.setObjectName("BtnAddAncora")
+        self.btn_add_linha.setCursor(Qt.PointingHandCursor)
+        self.btn_add_linha.clicked.connect(self.adicionar_linha_vazia)
 
         #Rodapé
         rodape_layout = QHBoxLayout()
@@ -238,14 +285,76 @@ class TelaConfig(QWidget):
         layout.addSpacing(10)
         layout.addWidget(tabela_label)
         layout.addWidget(self.tabela)
+        layout.addWidget(self.btn_add_linha)
         layout.addStretch()
         layout.addLayout(rodape_layout)
         self.setLayout(layout)
 
+        self.carregar_dados()
+    def adicionar_linha_vazia(self):
+        """Adiciona uma nova linha em branco no final da tabela"""
+        linha_atual = self.tabela.rowCount()   
+        self.tabela.insertRow(linha_atual)
+
+        self.tabela.setItem(linha_atual, 0, QTableWidgetItem(str(linha_atual + 1)))
+        self.tabela.setItem(linha_atual, 1, QTableWidgetItem(""))
+        self.tabela.setItem(linha_atual, 2, QTableWidgetItem(""))
+
+    def carregar_dados(self):
+        """Lê o arquivo config.json e popula a tabela"""
+        if os.path.exists(ARQUIVO_CONFIG):
+            with open(ARQUIVO_CONFIG, 'r', encoding='utf-8') as f:
+                try:
+                    dados = json.load(f)
+                    self.tabela.setRowCount(len(dados))
+                    for i, ancora in enumerate(dados):
+                            self.tabela.setItem(i, 0, QTableWidgetItem(ancora.get('ordem', '')))
+                            self.tabela.setItem(i, 1, QTableWidgetItem(ancora.get('campo', '')))
+
+                            caminho_salvo = ancora.get('caminho', '')
+                            item_caminho = QTableWidgetItem(caminho_salvo)
+                            item_caminho.setToolTip(caminho_salvo)
+                            self.tabela.setItem(i, 2, item_caminho)
+                except json.JSONDecodeError:
+                    pass
+        else:
+            self.adicionar_linha_vazia()
+
     def salvar_e_notificar(self):
-        """Simula o salvamento e exibe a Tela 3 (Toast)"""
+        """Lê a tabela linha por linha e salva no config.json"""
+        dados_para_salvar = []
+        for linha in range(self.tabela.rowCount()):
+            item_ordem = self.tabela.item(linha, 0)
+            item_campo = self.tabela.item(linha, 1)
+            item_caminho = self.tabela.item(linha, 2)
+
+            if item_campo and item_campo.text().strip():
+                ancora = {
+                    "ordem": item_ordem.text() if item_ordem else "",
+                    "campo": item_campo.text(),
+                    "caminho": item_caminho.text() if item_caminho else ""
+                }
+                dados_para_salvar.append(ancora)
+        with open(ARQUIVO_CONFIG, 'w', encoding='utf-8') as f:
+            json.dump(dados_para_salvar, f, indent=4, ensure_ascii=False)
+
         self.main_window.mudar_tela(0)
         self.main_window.mostrar_toast()
+
+    def escolher_imagem(self, linha, coluna):
+        if coluna == 2:
+            caminho_arquivo, _ = QFileDialog.getOpenFileName(
+                self,
+                "Selecione a Imagem da Âncora",
+                "",
+                "Imagens (*.png *.jpg *.jpeg *.bmp)"
+            )
+        if caminho_arquivo:
+            caminho_formatado = os.path.normpath(caminho_arquivo)
+
+            item_caminho = QTableWidgetItem(caminho_formatado)
+            item_caminho.setToolTip(caminho_formatado)
+            self.tabela.setItem(linha, 2, item_caminho)
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
@@ -298,7 +407,10 @@ class MainWindow(QMainWindow):
     def mudar_tela(self, indice):
         """Alterna entre as janelas"""
         self.stack.setCurrentIndex(indice)
-        self.setFocus()
+        if indice == 1:
+            self.tela_auth.input_senha.setFocus()
+        else:
+            self.setFocus()
 
     def mostrar_toast(self):
         """Exibe o alerta de sucesso e esconde após 3 segundos"""
