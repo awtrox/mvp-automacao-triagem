@@ -5,7 +5,7 @@ import os
 from PySide6.QtWidgets import (QApplication, QMainWindow, QStackedWidget, QWidget, 
                                QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
                                QLineEdit, QTableWidget, QTableWidgetItem, QHeaderView, 
-                               QFrame, QFileDialog)
+                               QFrame, QFileDialog, QComboBox, QDialog, QFormLayout, QDialogButtonBox)
 from PySide6.QtCore import Qt, QTimer
 PASTA_DATA = os.path.join(os.path.dirname(__file__), 'data')
 ARQUIVO_CONFIG = os.path.join(PASTA_DATA, 'config.json')
@@ -227,6 +227,42 @@ class TelaAuth(QWidget):
             else:
                 super().keyPressEvent(event)
 
+class DialogAcoes(QDialog):
+    def __init__(self, parent=None, dados_existentes=None):
+        super().__init__(parent)
+        self.setWindowTitle("COnfigurar ações")
+        self.setFixedSize(400, 250)
+        self.setStyleSheet("background-color: #1E1E2E; color: white;")
+
+        layout = QVBoxLayout(self)
+        form_layout = QFormLayout()
+
+        self.combo_acao = QComboBox()
+        self.combo_acao.addItems(["Procurar e Clicar", "Digitar texto", "Pressionar Teclas", "Aguardar (Segundos)"])
+
+        self.input_parametro = QLineEdit()
+        self.input_parametro.setPlaceholderText("Ex: tab, enter, texto a digitar...")
+
+        form_layout.addRow("Ação:", self.combo_acao)
+        form_layout.addRow("Parâmetro:", self.input_parametro)
+        layout.addLayout(form_layout)
+
+        botoes = QDialogButtonBox(QDialogButtonBox.Save |QDialogButtonBox.Cancel)
+        botoes.accepted.connect(self.accept)
+        botoes.rejected.connect(self.reject)
+        layout.addWidget(botoes)
+
+        self.dados_salvos = dados_existentes or {}
+        if self.dados_salvos:
+            self.combo_acao.setCurrentText(self.dados_salvos.get("acao", "Procurar e Clicar"))
+            self.input_parametro.setText(self.dados_salvos.get("parametro", ""))
+
+    def get_dados(self):
+        """Retorna as configurações escolhidas no pop-up"""
+        return {
+            "acao": self.combo_acao.currentText(),
+            "parametro": self.input_parametro.text()
+        }
 
 class TelaConfig(QWidget):
     def __init__(self, main_window):
@@ -245,16 +281,32 @@ class TelaConfig(QWidget):
         tabela_label.setStyleSheet("font-size: 16px; margin-top: 20px;")
         tabela_label.setAlignment(Qt.AlignCenter)
 
-        self.tabela = QTableWidget(0, 3)
+        combo_layout = QHBoxLayout()
+        label_combo = QLabel("Selecione o Fluxo")
+        label_combo.setStyleSheet("font-size: 16px; font-weight: bold;")
+
+        self.combo_fluxos = QComboBox()
+        self.combo_fluxos.addItems(["Urgência", "Medicamento", "Pressão", "Glicemia", "Curativo", "Exames", "Retirada de pontos", "Fluxo padrão"])
+        self.combo_fluxos.setMinimumHeight(35)
+        self.combo_fluxos.setStyleSheet("font-size: 14px; padding: 5px;")
+        self.combo_fluxos.currentTextChanged.connect(self.carregar_dados)
+        
+        combo_layout.addWidget(label_combo)
+        combo_layout.addWidget(self.combo_fluxos)
+        combo_layout.addStretch
+
+        self.tabela = QTableWidget(0, 4)
         self.tabela.setTextElideMode(Qt.ElideMiddle)
         self.tabela.setWordWrap(False)
         self.tabela.setTabKeyNavigation(False)
-        self.tabela.setHorizontalHeaderLabels(["Ordem", "Nome do campo", "Caminho da imagem"])
+        self.tabela.setHorizontalHeaderLabels(["Ordem", "Identificação", "Caminho da imagem", "Ação", "Parâmetro(s)"])
         self.tabela.verticalHeader().setVisible(False)
         header = self.tabela.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
         header.setSectionResizeMode(2, QHeaderView.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+
         header.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.tabela.cellDoubleClicked.connect(self.escolher_imagem)
 
@@ -283,6 +335,7 @@ class TelaConfig(QWidget):
         
         layout.addWidget(titulo)
         layout.addSpacing(10)
+        layout.addLayout(combo_layout)
         layout.addWidget(tabela_label)
         layout.addWidget(self.tabela)
         layout.addWidget(self.btn_add_linha)
@@ -299,44 +352,90 @@ class TelaConfig(QWidget):
         self.tabela.setItem(linha_atual, 0, QTableWidgetItem(str(linha_atual + 1)))
         self.tabela.setItem(linha_atual, 1, QTableWidgetItem(""))
         self.tabela.setItem(linha_atual, 2, QTableWidgetItem(""))
+        
+        btn_acoes = QPushButton("Configurar")
+        btn_acoes.setStyleSheet("background-color: #2A2A3C; color: white; border-radius: 4px; padding: 4px;")
+
+        btn_acoes.clicked.connect(lambda _, r=linha_atual: self.abrir_menu_config(r))
+        self.tabela.setCellWidget(linha_atual, 3, btn_acoes)
+
 
     def carregar_dados(self):
         """Lê o arquivo config.json e popula a tabela"""
+        fluxo_atual = self.combo_fluxos.currentText()
+        self.tabela.setRowCount(0)
+
         if os.path.exists(ARQUIVO_CONFIG):
             with open(ARQUIVO_CONFIG, 'r', encoding='utf-8') as f:
                 try:
-                    dados = json.load(f)
-                    self.tabela.setRowCount(len(dados))
-                    for i, ancora in enumerate(dados):
-                            self.tabela.setItem(i, 0, QTableWidgetItem(ancora.get('ordem', '')))
-                            self.tabela.setItem(i, 1, QTableWidgetItem(ancora.get('campo', '')))
+                    dados_completos = json.load(f)
 
-                            caminho_salvo = ancora.get('caminho', '')
-                            item_caminho = QTableWidgetItem(caminho_salvo)
-                            item_caminho.setToolTip(caminho_salvo)
-                            self.tabela.setItem(i, 2, item_caminho)
+                    dados_fluxo = dados_completos.get(fluxo_atual, [])
+
+                    self.tabela.setRowCount(len(dados_fluxo))
+                    for i, ancora in enumerate(dados_fluxo):
+                        self.tabela.setItem(i, 0, QTableWidgetItem(ancora.get('ordem', '')))
+                        item_campo = QTableWidgetItem(ancora.get('campo', ''))
+                        dados_config = {
+                            "acao": ancora.get('acao', 'Procurar e Clicar'),
+                            "parametro": ancora.get('parametro', '')
+                        }
+                        item_campo.setData(Qt.UserRole, dados_config)
+                        self.tabela.setItem(i, 1, item_campo)
+
+                        caminho_salvo = ancora.get('caminho', '')
+                        item_caminho = QTableWidgetItem(caminho_salvo)
+                        item_caminho.setToolTip(caminho_salvo)
+                        self.tabela.setItem(i, 2, item_caminho) 
+
+                        btn_acoes = QPushButton("Configurar")
+
+                        if ancora.get('parametro') or ancora.get('acao', 'Procurar e Clicar') != 'Procurar e Clicar':
+                            btn_acoes.setText("Configurado")
+                            btn_acoes.setStyleSheet("background-color: #2E7D32; color: white; border-radius: 4px; padding: 4px; font-weight: bold;")
+                        else:
+                            btn_acoes.setStyleSheet("background-color: #2A2A3C; color: white; border-radius: 4px; padding: 4px;")
+                        btn_acoes.clicked.connect(lambda _, r=i: self.abrir_menu_config(r))
+                        self.tabela.setCellWidget(i, 3, btn_acoes)
                 except json.JSONDecodeError:
                     pass
-        else:
+        if self.tabela.rowCount() == 0:
             self.adicionar_linha_vazia()
 
     def salvar_e_notificar(self):
         """Lê a tabela linha por linha e salva no config.json"""
-        dados_para_salvar = []
+        fluxo_atual = self.combo_fluxos.currentText()
+        dados_completos = {}
+        if os.path.exists(ARQUIVO_CONFIG):
+            with open(ARQUIVO_CONFIG, 'r', encoding='utf-8') as f:
+                try:
+                    dados_completos = json.load(f)
+                    if isinstance(dados_completos, list):
+                        dados_completos = {"Fluxo padrão": dados_completos}
+                except json.JSONDecodeError:
+                    pass
+
+        dados_fluxo_atual = []
         for linha in range(self.tabela.rowCount()):
             item_ordem = self.tabela.item(linha, 0)
             item_campo = self.tabela.item(linha, 1)
             item_caminho = self.tabela.item(linha, 2)
 
             if item_campo and item_campo.text().strip():
+                dados_config = item_campo.data(Qt.UserRole)
                 ancora = {
                     "ordem": item_ordem.text() if item_ordem else "",
                     "campo": item_campo.text(),
-                    "caminho": item_caminho.text() if item_caminho else ""
+                    "caminho": item_caminho.text() if item_caminho else "",
+
+                    "acao": dados_config.get("acao", "Procurar e Clicar") if dados_config else "Procurar e Clicar",
+                    "parametro": dados_config.get("parametro", "") if dados_config else ""
                 }
-                dados_para_salvar.append(ancora)
+                dados_fluxo_atual.append(ancora)
+
+        dados_completos[fluxo_atual] = dados_fluxo_atual
         with open(ARQUIVO_CONFIG, 'w', encoding='utf-8') as f:
-            json.dump(dados_para_salvar, f, indent=4, ensure_ascii=False)
+            json.dump(dados_completos, f, indent=4, ensure_ascii=False)
 
         self.main_window.mudar_tela(0)
         self.main_window.mostrar_toast()
@@ -349,12 +448,30 @@ class TelaConfig(QWidget):
                 "",
                 "Imagens (*.png *.jpg *.jpeg *.bmp)"
             )
-        if caminho_arquivo:
-            caminho_formatado = os.path.normpath(caminho_arquivo)
+            if caminho_arquivo:
+                caminho_formatado = os.path.normpath(caminho_arquivo)
 
-            item_caminho = QTableWidgetItem(caminho_formatado)
-            item_caminho.setToolTip(caminho_formatado)
-            self.tabela.setItem(linha, 2, item_caminho)
+                item_caminho = QTableWidgetItem(caminho_formatado)
+                item_caminho.setToolTip(caminho_formatado)
+                self.tabela.setItem(linha, 2, item_caminho)
+
+    def abrir_menu_config(self, linha):
+        item_campo = self.tabela.item(linha, 1)
+        if not item_campo:
+            return
+
+        dados_salvos = item_campo.data(Qt.UserRole)
+        dialog = DialogAcoes(self, dados_existentes=dados_salvos)
+
+        if dialog.exec() == QDialog.Accepted:
+            novos_dados = dialog.get_dados()
+
+            item_campo.setData(Qt.UserRole, novos_dados)
+
+            btn = self.tabela.cellWidget(linha, 3)
+            if btn:
+                btn.setText("Configurado")
+                btn.setStyleSheet("background-color: #2E7D32; color: white; border-radius: 4px; padding: 4px; font-weight: bold;")
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
