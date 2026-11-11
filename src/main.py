@@ -2,11 +2,13 @@ import sys
 import time
 import json
 import os
+import bcrypt
 from PySide6.QtWidgets import (QApplication, QMainWindow, QStackedWidget, QWidget, 
                                QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
                                QLineEdit, QTableWidget, QTableWidgetItem, QHeaderView, 
                                QFrame, QFileDialog, QComboBox, QDialog, QFormLayout, QDialogButtonBox)
 from PySide6.QtCore import Qt, QTimer
+SENHA_ADMIN_HASH = b'$2b$12$nCn0OOpj3PrX6.jE2TULwOXKRzDXu6N1gvVBDLwOL0MQAvf8U6Mje'
 PASTA_DATA = os.path.join(os.path.dirname(__file__), 'data')
 ARQUIVO_CONFIG = os.path.join(PASTA_DATA, 'config.json')
 
@@ -198,13 +200,23 @@ class TelaAuth(QWidget):
 
     def verificar_senha(self):
         #Lógica de validação ficticia
-        if self.input_senha.text() == "admin":
+        senha_digitada = self.input_senha.text()
+        senha_bytes = senha_digitada.encode('utf-8')
+
+        if bcrypt.checkpw(senha_bytes, SENHA_ADMIN_HASH):
             self.input_senha.clear()
             self.lbl_erro.setText("")
             self.main_window.is_logged_in = True
             # self.main_window.ultimo_login = time.time()
             self.main_window.mudar_tela(2)
         else:
+            self.input_senha.setStyleSheet("""
+                border: 2px solid #D32F2F; 
+                background-color: #2A2A3C; 
+                color: white; 
+                border-radius: 6px; 
+                padding: 10px;
+            """)
             self.lbl_erro.setText("Senha Incorreta!")
             self.input_senha.clear()
             self.input_senha.setFocus()
