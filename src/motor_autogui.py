@@ -1,7 +1,5 @@
-import keyboard
 import pyautogui
 import pyperclip
-import threading
 import time
 import os
 import sys
@@ -63,20 +61,20 @@ class MotorRPAThread(QThread):
                 time.sleep(Config.DELAY_PADRAO)
                 match acao:
                     case "Procurar e Clicar":
-                        move_and_click(localizar(caminho_img))
+                        self.move_and_click(self.localizar(caminho_img))
                         time.sleep(Config.DELAY_CURTO)
                     case "Procurar e Pressionar Teclas":
-                        localizar_popup(caminho_img)
+                        self.localizar_popup(caminho_img)
                         if parametro:
                             teclas = [t.strip() for t in parametro.split(',')]
                         pyautogui.press(teclas)
                         time.sleep(Config.DELAY_CURTO)
                     case "Procurar e Digitar texto":
-                        localizar_popup(caminho_img)
-                        inserir_texto(parametro)
+                        self.localizar_popup(caminho_img)
+                        self.inserir_texto(parametro)
                         time.sleep(Config.DELAY_CURTO)
                     case "Digitar texto":
-                        inserir_texto(parametro)
+                        self.inserir_texto(parametro)
                         time.sleep(Config.DELAY_CURTO)
                     case "Pressionar Teclas":
                         if parametro:
@@ -89,44 +87,48 @@ class MotorRPAThread(QThread):
             if self.rodando:
                 self.finalizado.emit()
         except Exception as e:
-            self.erro.emit(f"Erro inesperado: {str(e)}")
+            self.erro.emit(str(e))
 
     def parar(self):
         """Função chamada pelo botão 'Parar' na interface"""
         self.rodando = False
 
-def move_and_click(botao):
-    pyautogui.moveTo(botao, duration=0.1)
-    pyautogui.click()
+    def move_and_click(self, botao):
+        if not self.rodando: return
+        pyautogui.moveTo(botao, duration=0.1)
+        pyautogui.click()
 
-def motor_de_busca(endereco_imagem, region_image=None, limite_tentativas=67, retornar_centro=True):
-    coordenada = None
-    tentativas = limite_tentativas
-    if isinstance(endereco_imagem, str):
-        endereco_imagem = [endereco_imagem]
-    while tentativas > 0:
-        for img in endereco_imagem:
-            try:
-                caminho_absoluto = caminho_recurso(img)
-                if retornar_centro:
-                    coordenada = pyautogui.locateCenterOnScreen(caminho_absoluto, confidence=0.8, grayscale=True, region=region_image)
-                else:
-                    coordenada = pyautogui.locateOnScreen(caminho_absoluto, confidence=0.8, grayscale=True, region=region_image)
-                if coordenada is not None:
-                    return coordenada
-            except pyautogui.ImageNotFoundException:
-                pass
-        time.sleep(Config.DELAY_CURTO)
-        tentativas -= 1
-    raise Exception(f"Interrompido: {endereco_imagem} não encontrado.")
+    def motor_de_busca(self, endereco_imagem, region_image=None, limite_tentativas=67, retornar_centro=True):
+        coordenada = None
+        tentativas = limite_tentativas
+        if isinstance(endereco_imagem, str):
+            endereco_imagem = [endereco_imagem]
+        while tentativas > 0:
+            if not self.rodando:
+                raise Exception("Automação interrompida pelo usuário.")
+            for img in endereco_imagem:
+                try:
+                    caminho_absoluto = caminho_recurso(img)
+                    if retornar_centro:
+                        coordenada = pyautogui.locateCenterOnScreen(caminho_absoluto, confidence=0.8, grayscale=True, region=region_image)
+                    else:
+                        coordenada = pyautogui.locateOnScreen(caminho_absoluto, confidence=0.8, grayscale=True, region=region_image)
+                    if coordenada is not None:
+                        return coordenada
+                except pyautogui.ImageNotFoundException:
+                    pass
+            time.sleep(Config.DELAY_CURTO)
+            tentativas -= 1
+        raise Exception(f"Interrompido: imagem não encontrada.")
 
-def localizar(endereco_imagem, region_image=None):
-    return motor_de_busca(endereco_imagem, region_image, retornar_centro=True)
+    def localizar(self, endereco_imagem, region_image=None):
+        return self.motor_de_busca(endereco_imagem, region_image, retornar_centro=True)
 
-def localizar_popup(endereco_pop_up, region_pop_up=None):
-    return motor_de_busca(endereco_pop_up, region_pop_up, retornar_centro=False)
+    def localizar_popup(self, endereco_pop_up, region_pop_up=None):
+        return self.motor_de_busca(endereco_pop_up, region_pop_up, retornar_centro=False)
 
-def inserir_texto(texto):
-    pyperclip.copy(texto)
-    pyautogui.hotkey("ctrl", "v")
-    pyautogui.press("enter")
+    def inserir_texto(self, texto):
+        if not self.rodando: return
+        pyperclip.copy(texto)
+        pyautogui.hotkey("ctrl", "v")
+        pyautogui.press("enter")

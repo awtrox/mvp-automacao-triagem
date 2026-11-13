@@ -244,7 +244,6 @@ class TelaInicial(QWidget):
             }
         """)
         linha_botoes = QHBoxLayout()
-        # linha_botoes.addStretch()
         linha_botoes.addWidget(self.btn_iniciar)
         linha_botoes.addWidget(self.btn_parar)
         #Botão de configuração
@@ -875,9 +874,16 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("MVP - Hospital São João Batista do Glória")
-        #Configuração de estilo
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
         self.setFixedSize(500, 600)
         self.setStyleSheet(STYLE_SHEET)
+        tela = QApplication.primaryScreen().availableGeometry()
+        tamanho_janela = self.frameGeometry()
+        margem = 15
+        pos_x = tela.left() + margem
+        pos_y = tela.height() - tamanho_janela.height() - (margem * 3)
+        self.move(pos_x, pos_y)
+        #Configuração de estilo
         #Variáveis de sessão
         self.is_logged_in = False
         self.ultimo_login = None
