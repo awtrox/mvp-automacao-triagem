@@ -12,28 +12,39 @@ class Config:
     DELAY_PADRAO = 0.5
 PASTA_DATA = os.path.join(os.path.dirname(__file__), 'data')    
 ARQUIVO_CONFIG = os.path.join(PASTA_DATA, 'config.json')
-#Motores de funções
-def caminho_recurso(caminho_relativo):
-    try:
-        caminhho_base = sys._MEIPASS
-    except Exception:
-        caminhho_base = os.path.abspath(".")
-    
-    return os.path.join(caminhho_base, caminho_relativo)
-
 class MotorRPAThread(QThread):
+    """
+    Thread dedicada à execução de fluxos de automação RPA em segundo plano,
+    garantindo que a interface gráfica (PySide6) permaneça responsiva.
+    
+    Attributes:
+        status_atualizado (Signal): Emite mensagens de texto com o passo atual do robô.
+        finalizado (Signal): Emitido quando o fluxo é concluído com sucesso.
+        erro (Signal): Emitido caso ocorra alguma falha ou interrupção inesperada.
+    """
     status_atualizado = Signal(str)
     finalizado = Signal()
     erro = Signal(str)
 
     def __init__(self, nome_fluxo, parent=None):
+        """
+        Inicializa a thread do motor RPA.
+
+        Args:
+            nome_fluxo (str): O nome do fluxo configurado no JSON a ser executado.
+            parent (QObject, optional): Objeto pai da thread no Qt. Padrão é None.
+        """
         super().__init__(parent)
         self.nome_fluxo = nome_fluxo
         self.rodando = True
 
     def run(self):
+        """
+        Método principal executado em background ao iniciar a thread.
+        Carrega o arquivo de configuração JSON e executa os passos sequencialmente,
+        respeitando as travas de segurança e o sinal de interrupção do usuário.
+        """
         pyautogui.FAILSAFE = True
-
         try:
             caminho_config = ARQUIVO_CONFIG
             if not os.path.exists(caminho_config):
@@ -43,7 +54,6 @@ class MotorRPAThread(QThread):
                 dados_completos = json.load(f)
 
             passos_do_fluxo = dados_completos.get(self.nome_fluxo, [])
-
             if not passos_do_fluxo:
                 self.erro.emit(f"O fluxo '{self.nome_fluxo}' está vazio.")
                 return
@@ -90,15 +100,36 @@ class MotorRPAThread(QThread):
             self.erro.emit(str(e))
 
     def parar(self):
-        """Função chamada pelo botão 'Parar' na interface"""
+        """Interrompe a execução do motor de forma segura alterando a flag de controle."""
         self.rodando = False
 
     def move_and_click(self, botao):
+        """
+        Move o cursor do mouse até as coordenadas indicadas e realiza um clique esquerdo.
+        
+        Args:
+            botao (tuple/Point): Coordenadas (x, y) do centro da imagem encontrada.
+        """
         if not self.rodando: return
         pyautogui.moveTo(botao, duration=0.1)
         pyautogui.click()
 
     def motor_de_busca(self, endereco_imagem, region_image=None, limite_tentativas=67, retornar_centro=True):
+        """
+        Realiza a varredura na tela em busca de uma imagem de referência de forma tolerante a falhas.
+        
+        Args:
+            endereco_imagem (str or list): Caminho relativo ou lista de caminhos para a imagem do elemento.
+            region_image (tuple, optional): Região (x, y, largura, altura) para limitar a busca. Padrão é None.
+            limite_tentativas (int): Número máximo de tentativas antes de abortar o passo. Padrão é 67.
+            retornar_centro (bool): Se True, retorna o centro do elemento; se False, retorna a caixa delimitadora.
+            
+        Returns:
+            tuple: Coordenadas do elemento encontrado na tela.
+            
+        Raises:
+            Exception: Se o elemento não for encontrado após o limite de tentativas ou se a thread for abortada.
+        """
         coordenada = None
         tentativas = limite_tentativas
         if isinstance(endereco_imagem, str):
@@ -108,11 +139,10 @@ class MotorRPAThread(QThread):
                 raise Exception("Automação interrompida pelo usuário.")
             for img in endereco_imagem:
                 try:
-                    caminho_absoluto = caminho_recurso(img)
                     if retornar_centro:
-                        coordenada = pyautogui.locateCenterOnScreen(caminho_absoluto, confidence=0.8, grayscale=True, region=region_image)
+                        coordenada = pyautogui.locateCenterOnScreen(img, confidence=0.8, grayscale=True, region=region_image)
                     else:
-                        coordenada = pyautogui.locateOnScreen(caminho_absoluto, confidence=0.8, grayscale=True, region=region_image)
+                        coordenada = pyautogui.locateOnScreen(img, confidence=0.8, grayscale=True, region=region_image)
                     if coordenada is not None:
                         return coordenada
                 except pyautogui.ImageNotFoundException:
@@ -122,12 +152,21 @@ class MotorRPAThread(QThread):
         raise Exception(f"Interrompido: imagem não encontrada.")
 
     def localizar(self, endereco_imagem, region_image=None):
+        """Atalho para buscar o elemento retornando o ponto central (para cliques)."""
         return self.motor_de_busca(endereco_imagem, region_image, retornar_centro=True)
 
     def localizar_popup(self, endereco_pop_up, region_pop_up=None):
+        """Atalho para buscar o elemento retornando a caixa de delimitação (para pop-ups)."""
         return self.motor_de_busca(endereco_pop_up, region_pop_up, retornar_centro=False)
 
     def inserir_texto(self, texto):
+        """
+        Insere texto de forma segura utilizando a área de transferência (Clipboard) 
+        para evitar perdas de caracteres em campos de digitação rápida.
+        
+        Args:
+            texto (str): O conteúdo textual que deve ser enviado ao campo focado.
+        """
         if not self.rodando: return
         pyperclip.copy(texto)
         pyautogui.hotkey("ctrl", "v")
