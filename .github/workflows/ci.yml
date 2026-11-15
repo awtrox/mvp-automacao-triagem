@@ -1,30 +1,28 @@
-name: CI Pipeline - MVP Triagem
+name: CI - Build e Testes Automatizados
 
 on:
-    push:
-        branches: ["main", "master"]
-    pull_request:
-        branches: ["main", "master"]
+  push:
+    branches: [ main, feature/integracao-motor-ui ]
+  pull_request:
+    branches: [ main ]
 
-jobs: 
-    build-and-test:
-        runs-on: ubuntu-latest
+jobs:
+  build-and-test:
+    runs-on: windows-latest
 
-        steps:
-        - name: Fazer o checkout do repositório
-          uses: actions/checkout@v3
-        
-        - name: Configurar o python 3.11
-          uses: actions/setup-python@v4
-          with:
-            python-version: "3.11"
+    steps:
+      - name: Fazer checkout do código
+        uses: actions/checkout@v4
 
-        - name: Instalar dependências
-          run: |
-            python -m pip install --upgrade pip
-            pip install pytest
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-        - name: Executar testes com Pytest
-          run: |
-            pytest tests/
-    
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install PySide6 pyautogui pyperclip bcrypt pytest pytest-cov
+
+      - name: Executar testes automatizados
+        run: python -m pytest -v --cov=src.motor_autogui
