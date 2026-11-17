@@ -79,9 +79,25 @@ STYLE_SHEET = """
     QPushButton#BtnAddAncora:pressed {
         background-color: #1B5E20;
     }
+    QPushButton#BtnContraste {
+        background-color: #2B2D30;
+        color: #E0E0E0;
+        border: 1px solid #4E5157;
+        border-radius: 17px;
+        font-size: 18px;
+        padding: 0px;
+    }
+    QPushButton#BtnContraste:hover {
+        background-color: #393B40;
+        border: 1px solid #868A91;
+        color: #FFFFFF;
+    }
+    QPushButton#BtnContraste:pressed {
+        background-color: #1E1F22;
+    }
     /* Foco visível para navegação no teclado */
     QPushButton:focus, QLineEdit:focus, QTableWidget:focus, 
-    #BtnPrimario:focus, #BtnCancelar:focus {
+    #BtnPrimario:focus, #BtnCancelar:focus, #BtnContraste:focus {
         border: 2px solid #00E5FF;
     }
     QLineEdit {
@@ -118,9 +134,22 @@ class TelaInicial(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(30, 30, 30, 30)
         #Título e status
+        layout_topo = QHBoxLayout()
+        layout_topo.setContentsMargins(0, 0, 0, 8)
+        layout_topo.addSpacing(34)
         titulo = QLabel("Automação de Triagem")
         titulo.setObjectName("Titulo")
         titulo.setAlignment(Qt.AlignCenter)
+        self.btn_contraste = QPushButton("◐")
+        self.btn_contraste.setFixedSize(34, 34)
+        self.btn_contraste.setObjectName("BtnContraste")
+        self.btn_contraste.setCursor(Qt.PointingHandCursor)
+        self.btn_contraste.setToolTip("Alternar Modo de Alto Contraste (Atalho: Alt+C)")
+        self.btn_contraste.setAccessibleName("Alternar Modo de Alto Contraste")
+        self.btn_contraste.setShortcut("Alt+C")
+        self.btn_contraste.clicked.connect(self.alternar_alto_contraste)
+        layout_topo.addWidget(titulo)
+        layout_topo.addWidget(self.btn_contraste)
         status = QLabel("Motor de automação: ATIVO")
         status.setObjectName("StatusMotor")
         status.setAlignment(Qt.AlignCenter)
@@ -253,7 +282,7 @@ class TelaInicial(QWidget):
         self.btn_config.setCursor(Qt.PointingHandCursor)
         self.btn_config.clicked.connect(self.main_window.tentar_acessar_config)
         #Implementação de layout
-        layout.addWidget(titulo)
+        layout.addLayout(layout_topo)
         layout.addWidget(status)
         layout.addSpacing(20)
         layout.addWidget(card_fluxos)
@@ -351,6 +380,31 @@ class TelaInicial(QWidget):
         
         self.label_status.setStyleSheet(novo_estilo)
         self.label_status.setText(mensagem)
+
+    def alternar_alto_contraste(self):
+        if not getattr(self, "alto_contraste_ativo", False):
+            self.setStyleSheet("""
+                QWidget {
+                    background-color: #000000;
+                    color: #FFFF00;
+                    font-size: 15px;
+                    font-weight: bold;
+                }
+                QPushButton {
+                    background-color: #1A1A1A;
+                    color: #FFFFFF;
+                    border: 2px solid #FFFF00;
+                    padding: 6px;
+                }
+                QPushButton:hover {
+                    background-color: #FFFF00;
+                    color: #000000;
+                }
+            """)
+            self.alto_contraste_ativo = True
+        else:
+            self.setStyleSheet("")
+            self.alto_contraste_ativo = False
     
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
