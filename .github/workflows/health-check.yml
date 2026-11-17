@@ -1,0 +1,22 @@
+name: Monitoramento de Disponibilidade (Health Check)
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Executa automaticamente a cada 6 horas
+  workflow_dispatch:       # Permite executar manualmente a qualquer momento
+
+jobs:
+  health-check:
+    runs-on: windows-latest
+    steps:
+      - name: Verificar disponibilidade da Release pública (Status UP)
+        shell: pwsh
+        run: |
+          $url = "https://github.com/awtrox/mvp-automacao-triagem/releases/tag/v1.0.0"
+          $response = Invoke-WebRequest -Uri $url -UseBasicParsing
+          if ($response.StatusCode -eq 200) {
+            Write-Host "STATUS: UP (HTTP 200) - Artefato de produção disponível e íntegro."
+          } else {
+            Write-Error "STATUS: DOWN - Falha ao acessar o artefato de produção."
+            exit 1
+          }
