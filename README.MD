@@ -13,3 +13,7 @@ Produto Mínimo Viável (MVP) desenvolvido para o setor de recepção de um Hosp
 1. Instale as dependências: `pip install -r requirements.txt`
 2. Execute o sistema: `python src/main.py`
 3. Execute os testes: `pytest tests/`
+
+### Acesso às Configurações (Ambiente de Avaliação/MVP)
+* **Senha padrão de administrador:** `admin123`
+* *(Nota: Nesta versão MVP, a validação é realizada via hash Bcrypt pré-configurado; o fluxo de alteração de senha pela interface gráfica está mapeado no backlog para versões futuras).*
