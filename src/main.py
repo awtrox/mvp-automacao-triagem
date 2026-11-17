@@ -3,6 +3,8 @@ import time
 import json
 import os
 import bcrypt
+import logging
+from datetime import datetime
 from motor_autogui import MotorRPAThread
 from PySide6.QtWidgets import (QApplication, QMainWindow, QStackedWidget, QWidget, 
                                QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
@@ -17,6 +19,20 @@ ARQUIVO_CONFIG = os.path.join(PASTA_DATA, 'config.json')
 
 if not os.path.exists(PASTA_DATA):
     os.makedirs(PASTA_DATA)
+
+os.makedirs("logs", exist_ok=True)
+logging.basicConfig(
+    filename="logs/saude_sistema.log",
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+def registrar_excecao_global(exc_type, exc_value, exc_traceback):
+    logging.critical("FALHA CRÍTICA (Downtime/Crash detectado)", exc_info=(exc_type, exc_value, exc_traceback))
+    sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
+sys.excepthook = registrar_excecao_global
+logging.info("HEALTH CHECK: Aplicação iniciada e operando normalmente.")
 
 STYLE_SHEET = """
     QWidget {
